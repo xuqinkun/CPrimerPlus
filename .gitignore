@@ -1,1 +1,4 @@
 *.exe
+*.build.log
+/build/
+.vscode/
