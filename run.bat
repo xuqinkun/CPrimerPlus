@@ -1,5 +1,5 @@
 @echo off
-chcp 936 >nul
+chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem Compile and run C sources
