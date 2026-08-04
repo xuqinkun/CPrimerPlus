@@ -1,9 +1,6 @@
 /* extern.c -- 外部变量的定义与声明（跨文件）
  * 编译链接（需同时编译 coal.c）:
- *   gcc -Wall -Wextra -std=c11 -g ^
- *       chapter12\12-1\extern.c chapter12\12-1\coal.c ^
- *       -o build\chapter12\12-1\extern.exe
- * 或在本目录运行: run_extern.bat
+ *   run.bat chapter12\12-1\extern.c chapter12\12-1\coal.c
  */
 #include <stdio.h>
 
