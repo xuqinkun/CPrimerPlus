@@ -7,6 +7,7 @@ rem Output: <repo>\build\<source-relative-dir>\<name>.exe
 rem   run.bat chapter03\const.c
 rem   run.bat chapter03\const.c -v
 rem   run.bat chapter12\12-1\extern.c chapter12\12-1\coal.c
+rem   run.bat chapter13\13-1\count.c -- file.txt
 rem   run.bat chapter03 --all
 
 set "ROOT=%~dp0"
@@ -15,6 +16,7 @@ set "RUN_ALL=0"
 set "VERBOSE=0"
 set "SRC_COUNT=0"
 set "DIR_TARGET="
+set "PROG_ARGS="
 
 :parse_args
 if "%~1"=="" goto after_args
@@ -37,7 +39,7 @@ if /I "%~1"=="--log" (
 )
 if /I "%~1"=="-o" (
     if "%~2"=="" (
-        echo 错误: -o 需要参数
+        echo Error: -o needs an argument
         exit /b 1
     )
     set "OUT_NAME=%~2"
@@ -50,19 +52,23 @@ if /I "%~1"=="--all" (
     shift
     goto parse_args
 )
+if "%~1"=="--" (
+    shift
+    goto collect_prog_args
+)
 if "%~1:~0,1%"=="-" (
-    echo 未知选项: %~1
+    echo Unknown option: %~1
     goto show_help
 )
 
-rem 位置参数：目录或 .c 文件（可多个 .c 一起链接）
+rem Positional: one directory, or one/more .c files to link together
 if exist "%~1\" (
     if defined DIR_TARGET (
-        echo 错误: 只能指定一个目录
+        echo Error: only one directory is allowed
         exit /b 1
     )
     if !SRC_COUNT! gtr 0 (
-        echo 错误: 不能同时指定目录和源文件
+        echo Error: cannot mix directory and source files
         exit /b 1
     )
     set "DIR_TARGET=%~1"
@@ -72,11 +78,11 @@ if exist "%~1\" (
 
 if /I "%~x1"==".c" (
     if defined DIR_TARGET (
-        echo 错误: 不能同时指定目录和源文件
+        echo Error: cannot mix directory and source files
         exit /b 1
     )
     if not exist "%~1" (
-        echo 错误: 文件不存在: %~1
+        echo Error: file not found: %~1
         exit /b 1
     )
     set /a SRC_COUNT+=1
@@ -85,13 +91,21 @@ if /I "%~x1"==".c" (
     goto parse_args
 )
 
-echo 错误: 请指定目录或 .c 文件: %~1
+echo Error: expected a directory or .c file, got: %~1
+echo Hint: to pass arguments to the program, use -- 
+echo   Example: run.bat chapter13\13-1\count.c -- myfile.txt
 exit /b 1
+
+:collect_prog_args
+if "%~1"=="" goto after_args
+set "PROG_ARGS=!PROG_ARGS! "%~1""
+shift
+goto collect_prog_args
 
 :after_args
 where gcc >nul 2>&1
 if errorlevel 1 (
-    echo 错误: 未找到 gcc，请先安装并加入 PATH
+    echo Error: gcc not found. Install it and add to PATH.
     exit /b 1
 )
 
@@ -119,38 +133,40 @@ for %%F in ("%DIR_TARGET%\*.c") do (
     set "SRC_COUNT=1"
     set "SRC_1=%%~fF"
     set "OUT_NAME="
+    set "PROG_ARGS="
     call :compile_and_run
     if errorlevel 1 set "FAILED=1"
 )
 if "!FOUND!"=="0" (
-    echo 错误: 目录中没有 .c 文件: %DIR_TARGET%
+    echo Error: no .c files in directory: %DIR_TARGET%
     exit /b 1
 )
 exit /b %FAILED%
 
 :show_help
-echo 用法: run.bat ^<目录^| .c文件...^> [选项]
+echo Usage: run.bat ^<dir ^| .c files...^> [options] [-- prog-args...]
 echo.
-echo 输出目录: ^<项目根^>\build\^<源文件相对目录^>\
+echo Output: ^<repo^>\build\^<source-relative-dir^>\
 echo.
-echo 选项:
-echo   -o ^<name^>     指定可执行文件名（默认取第一个 .c 的基名，无需 .exe）
-echo   --all         分别编译并运行目录下每个 .c（仅目录模式）
-echo   -v, --verbose 显示编译与运行日志（默认静默；失败时仍会打印编译错误）
-echo   --log         同 -v
-echo   -h, --help    显示帮助
+echo Options:
+echo   -o ^<name^>     output exe name (default: first .c basename, no .exe)
+echo   --all         compile and run each .c in a directory separately
+echo   -v, --verbose show compile/run logs
+echo   --log         same as -v
+echo   --            pass remaining args to the program
+echo   -h, --help    show help
 echo.
-echo 示例:
+echo Examples:
 echo   run.bat chapter03\const.c
 echo   run.bat chapter03\const.c -v
 echo   run.bat chapter12\12-1\extern.c chapter12\12-1\coal.c
-echo   run.bat chapter12\12-1\extern.c chapter12\12-1\coal.c -o extern -v
+echo   run.bat chapter13\13-1\count.c -- myfile.txt
 echo   run.bat chapter03 --all
 exit /b 0
 
 :compile_and_run
 if !SRC_COUNT! lss 1 (
-    echo 错误: 未指定源文件
+    echo Error: no source files
     exit /b 1
 )
 
@@ -163,7 +179,7 @@ rem Mirror source parent dirs under <ROOT>\build\
 set "RELDIR=!SRCDIR!"
 set "RELDIR=!RELDIR:%ROOT%=!"
 if "!RELDIR!"=="!SRCDIR!" (
-    echo 错误: 源文件必须位于 run.bat 所在项目目录下
+    echo Error: source must be under the repo of run.bat
     exit /b 1
 )
 
@@ -182,7 +198,7 @@ set "GCC_SRCS="
 set "SRC_LIST="
 for /L %%I in (1,1,!SRC_COUNT!) do (
     if not exist "!SRC_%%I!" (
-        echo 错误: 文件不存在: !SRC_%%I!
+        echo Error: file not found: !SRC_%%I!
         exit /b 1
     )
     set "GCC_SRCS=!GCC_SRCS! "!SRC_%%I!""
@@ -195,14 +211,14 @@ for /L %%I in (1,1,!SRC_COUNT!) do (
 
 set "CC_LOG=!BDIR!!LOGBASE!.build.log"
 if "!VERBOSE!"=="1" (
-    echo ==^> 编译: !SRC_LIST!
-    echo ==^> 输出: !OUT!
+    echo ==^> compile: !SRC_LIST!
+    echo ==^> output: !OUT!
     gcc -Wall -Wextra -std=c11 -g -o "!OUT!" !GCC_SRCS!
 ) else (
     gcc -Wall -Wextra -std=c11 -g -o "!OUT!" !GCC_SRCS! >"!CC_LOG!" 2>&1
 )
 if errorlevel 1 (
-    echo 编译失败: !SRC_LIST!
+    echo Compile failed: !SRC_LIST!
     if exist "!CC_LOG!" (
         type "!CC_LOG!"
         del "!CC_LOG!" >nul 2>&1
@@ -212,14 +228,14 @@ if errorlevel 1 (
 if exist "!CC_LOG!" del "!CC_LOG!" >nul 2>&1
 
 if "!VERBOSE!"=="1" (
-    echo ==^> 运行: !OUT!
+    echo ==^> run: !OUT! !PROG_ARGS!
     echo ----------------------------------------
 )
-"!OUT!"
+"!OUT!" !PROG_ARGS!
 set "CODE=!ERRORLEVEL!"
 if "!VERBOSE!"=="1" (
     echo ----------------------------------------
-    echo 退出码: !CODE!
+    echo exit code: !CODE!
 )
 exit /b !CODE!
 
@@ -233,23 +249,23 @@ for %%F in ("%DIR%\*.c") do (
 )
 
 if !COUNT!==0 (
-    echo 错误: 目录中没有 .c 文件: %DIR%
+    echo Error: no .c files in directory: %DIR%
     exit /b 1
 )
 
-echo 请选择要编译运行的文件:
+echo Select a file to compile and run:
 for /L %%I in (1,1,!COUNT!) do (
     echo   [%%I] !NAME_%%I!
 )
 
 :ask_choice
-set /p "CHOICE=输入编号 (1-!COUNT!): "
+set /p "CHOICE=Enter number (1-!COUNT!): "
 set "OK=0"
 for /L %%I in (1,1,!COUNT!) do (
     if "!CHOICE!"=="%%I" set "OK=1"
 )
 if "!OK!"=="0" (
-    echo 无效输入，请重试
+    echo Invalid input, try again
     goto ask_choice
 )
 set "SELECTED=!FILE_%CHOICE%!"
